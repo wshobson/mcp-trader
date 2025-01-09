@@ -16,7 +16,7 @@ dependencies = [
 ]
 [[project.authors]]
 name = "Seth Hobson"
-email = "wshobson@gmail.com"
+email = "seth@major7apps.com"
 
 [build-system]
 requires = [ "hatchling",]

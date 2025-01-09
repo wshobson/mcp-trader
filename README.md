@@ -55,7 +55,7 @@ Development Configuration:
       "command": "uv",
       "args": [
         "--directory",
-        "/Users/wshobson/workspace/modelcontextprotocol/mcp-trader",
+        "/absolute/path/to/mcp-trader",
         "run",
         "mcp-trader"
       ]
