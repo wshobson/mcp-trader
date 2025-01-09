@@ -105,3 +105,9 @@ See pyproject.toml for full dependency list:
 - pandas-ta >=0.3.14b0
 - python-dotenv >=1.0.1
 ```
+
+## Further Reading
+
+Learn more about this project through these detailed blog posts:
+
+- [Building a Stock Analysis Server with MCP, Part 1](https://sethhobson.com/2025/01/building-a-stock-analysis-server-with-mcp-part-1/) - Initial setup, architecture, and core technical analysis features
