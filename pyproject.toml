@@ -1,0 +1,26 @@
+[project]
+name = "mcp-trader"
+version = "0.1.0"
+description = "A sample MCP server for traders"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+ "aiohttp>=3.11.11",
+ "mcp>=1.2.0",
+ "numpy==1.26.4",
+ "pandas>=2.2.3",
+ "pandas-ta>=0.3.14b0",
+ "python-dotenv>=1.0.1",
+ "setuptools>=75.8.0",
+ "ta-lib>=0.6.0",
+]
+[[project.authors]]
+name = "Seth Hobson"
+email = "wshobson@gmail.com"
+
+[build-system]
+requires = [ "hatchling",]
+build-backend = "hatchling.build"
+
+[project.scripts]
+mcp-trader = "mcp_trader:main"
