@@ -35,9 +35,9 @@ TIINGO_API_KEY=your_api_key_here
 ### Installation
 
 ```bash
-uv sync
 uv venv --python 3.11
 source .venv/bin/activate # On Windows: .venv\Scripts\activate
+uv sync
 ```
 
 ## Configuration
