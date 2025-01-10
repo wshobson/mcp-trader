@@ -96,6 +96,8 @@ Analyze the technical setup for NVDA
 
 The server will return a technical analysis summary including trend status, momentum indicators, and key metrics.
 
+![NVDA Technical Analysis](./technical-mcp.png)
+
 ## Dependencies
 
 See pyproject.toml for full dependency list:
