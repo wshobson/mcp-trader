@@ -20,7 +20,8 @@ The server provides one tool (more to come):
 
 ### Prerequisites
 
-- Python 3.13+
+- Python 3.11+
+- [uv](https://github.com/astral-sh/uv)
 - [Tiingo API Key](https://api.tiingo.com/)
 
 ### Environment Variables
@@ -44,6 +45,7 @@ source .venv/bin/activate # On Windows: .venv\Scripts\activate
 ### Claude Desktop App
 
 On MacOS: `~/Library/Application\ Support/Claude/claude_desktop_config.json`
+
 On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
 
 Development Configuration:
