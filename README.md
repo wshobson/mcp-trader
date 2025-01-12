@@ -22,6 +22,7 @@ The server provides one tool (more to come):
 
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv)
+- [ta-lib](https://ta-lib.org/install/)
 - [Tiingo API Key](https://api.tiingo.com/)
 
 ### Environment Variables
