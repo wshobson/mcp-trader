@@ -116,3 +116,4 @@ See pyproject.toml for full dependency list:
 Learn more about this project through these detailed blog posts:
 
 - [Building a Stock Analysis Server with MCP, Part 1](https://sethhobson.com/2025/01/building-a-stock-analysis-server-with-mcp-part-1/) - Initial setup, architecture, and core technical analysis features
+- [Building a Stock Analysis Server with MCP, Part 2](https://sethhobson.com/2025/03/building-a-stock-analysis-server-with-mcp-part-2/) - Relative Strength, Volume, Pattern Recognition, Risk analysis
