@@ -1,5 +1,7 @@
 # MCP Trader Server
 
+[![smithery badge](https://smithery.ai/badge/mcp-trader)](https://smithery.ai/server/mcp-trader)
+
 A Model Context Protocol (MCP) server for stock traders.
 
 ## Features
@@ -31,6 +33,14 @@ Create a `.env` file:
 
 ```bash
 TIINGO_API_KEY=your_api_key_here
+```
+
+### Installing via Smithery
+
+To install Trader for Claude Desktop automatically via [Smithery](https://smithery.ai/server/mcp-trader):
+
+```bash
+npx -y @smithery/cli install mcp-trader --client claude
 ```
 
 ### Installation
