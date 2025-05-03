@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/wshobson-mcp-trader-badge.png)](https://mseep.ai/app/wshobson-mcp-trader)
+
 # MCP Trader Server
 
 [![smithery badge](https://smithery.ai/badge/mcp-trader)](https://smithery.ai/server/mcp-trader)
