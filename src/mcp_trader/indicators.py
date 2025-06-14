@@ -1,7 +1,7 @@
+from typing import Any
+
 import pandas as pd
 import pandas_ta as ta
-
-from typing import Dict, Any, List
 
 
 class TechnicalAnalysis:
@@ -32,12 +32,12 @@ class TechnicalAnalysis:
             return df
 
         except KeyError as e:
-            raise KeyError(f"Missing column in input DataFrame: {str(e)}")
+            raise KeyError(f"Missing column in input DataFrame: {str(e)}") from e
         except Exception as e:
-            raise Exception(f"Error calculating indicators: {str(e)}")
+            raise Exception(f"Error calculating indicators: {str(e)}") from e
 
     @staticmethod
-    def check_trend_status(df: pd.DataFrame) -> Dict[str, Any]:
+    def check_trend_status(df: pd.DataFrame) -> dict[str, Any]:
         """Analyze the current trend status."""
         if df.empty:
             raise ValueError("DataFrame is empty. Ensure it contains valid data.")
@@ -50,8 +50,7 @@ class TechnicalAnalysis:
             "20_50_bullish": latest["sma_20"] > latest["sma_50"],
             "50_200_bullish": latest["sma_50"] > latest["sma_200"],
             "rsi": latest["rsi"],
-            "macd_bullish": latest.get("MACD_12_26_9", 0)
-            > latest.get("MACDs_12_26_9", 0),
+            "macd_bullish": latest.get("MACD_12_26_9", 0) > latest.get("MACDs_12_26_9", 0),
         }
 
 
@@ -63,8 +62,8 @@ class RelativeStrength:
         market_data,
         symbol: str,
         benchmark: str = "SPY",
-        lookback_periods: List[int] = [21, 63, 126, 252],
-    ) -> Dict[str, float]:
+        lookback_periods: list[int] = None,
+    ) -> dict[str, float]:
         """
         Calculate relative strength compared to a benchmark across multiple timeframes.
 
@@ -78,10 +77,11 @@ class RelativeStrength:
             Dict[str, float]: Relative strength scores for each timeframe
         """
         try:
+            if lookback_periods is None:
+                lookback_periods = [21, 63, 126, 252]
+
             # Get data for both the stock and benchmark
-            stock_df = await market_data.get_historical_data(
-                symbol, max(lookback_periods) + 10
-            )
+            stock_df = await market_data.get_historical_data(symbol, max(lookback_periods) + 10)
             benchmark_df = await market_data.get_historical_data(
                 benchmark, max(lookback_periods) + 10
             )
@@ -100,8 +100,7 @@ class RelativeStrength:
                     stock_df["close"].iloc[-1] / stock_df["close"].iloc[-period] - 1
                 ) * 100
                 benchmark_return = (
-                    benchmark_df["close"].iloc[-1] / benchmark_df["close"].iloc[-period]
-                    - 1
+                    benchmark_df["close"].iloc[-1] / benchmark_df["close"].iloc[-period] - 1
                 ) * 100
 
                 # Calculate relative strength (stock return minus benchmark return)
@@ -119,14 +118,14 @@ class RelativeStrength:
             return rs_scores
 
         except Exception as e:
-            raise Exception(f"Error calculating relative strength: {str(e)}")
+            raise Exception(f"Error calculating relative strength: {str(e)}") from e
 
 
 class VolumeProfile:
     """Tools for analyzing volume distribution by price."""
 
     @staticmethod
-    def analyze_volume_profile(df: pd.DataFrame, num_bins: int = 10) -> Dict[str, Any]:
+    def analyze_volume_profile(df: pd.DataFrame, num_bins: int = 10) -> dict[str, Any]:
         """
         Create a volume profile analysis by price level.
 
@@ -168,9 +167,7 @@ class VolumeProfile:
 
                 # Calculate percentage of total volume
                 volume_percent = (
-                    (volume_in_bin / df["volume"].sum()) * 100
-                    if df["volume"].sum() > 0
-                    else 0
+                    (volume_in_bin / df["volume"].sum()) * 100 if df["volume"].sum() > 0 else 0
                 )
 
                 profile["bins"].append(
@@ -188,9 +185,7 @@ class VolumeProfile:
             profile["point_of_control"] = round(poc_bin["price_mid"], 2)
 
             # Find Value Area (70% of volume)
-            sorted_bins = sorted(
-                profile["bins"], key=lambda x: x["volume"], reverse=True
-            )
+            sorted_bins = sorted(profile["bins"], key=lambda x: x["volume"], reverse=True)
             cumulative_volume = 0
             value_area_bins = []
 
@@ -201,9 +196,7 @@ class VolumeProfile:
                     break
 
             if value_area_bins:
-                profile["value_area_low"] = round(
-                    min([b["price_low"] for b in value_area_bins]), 2
-                )
+                profile["value_area_low"] = round(min([b["price_low"] for b in value_area_bins]), 2)
                 profile["value_area_high"] = round(
                     max([b["price_high"] for b in value_area_bins]), 2
                 )
@@ -211,14 +204,14 @@ class VolumeProfile:
             return profile
 
         except Exception as e:
-            raise Exception(f"Error analyzing volume profile: {str(e)}")
+            raise Exception(f"Error analyzing volume profile: {str(e)}") from e
 
 
 class PatternRecognition:
     """Tools for detecting common chart patterns."""
 
     @staticmethod
-    def detect_patterns(df: pd.DataFrame) -> Dict[str, Any]:
+    def detect_patterns(df: pd.DataFrame) -> dict[str, Any]:
         """
         Detect common chart patterns in price data.
 
@@ -242,12 +235,10 @@ class PatternRecognition:
 
             # Find local minima and maxima
             recent_df["is_min"] = (
-                recent_df["low"].rolling(window=5, center=True).min()
-                == recent_df["low"]
+                recent_df["low"].rolling(window=5, center=True).min() == recent_df["low"]
             )
             recent_df["is_max"] = (
-                recent_df["high"].rolling(window=5, center=True).max()
-                == recent_df["high"]
+                recent_df["high"].rolling(window=5, center=True).max() == recent_df["high"]
             )
 
             # Get the indices, prices, and dates of local minima and maxima
@@ -269,22 +260,16 @@ class PatternRecognition:
                             days_apart = (date2 - date1).days
                             if days_apart >= 10 and days_apart <= 60:
                                 # Check if there's a peak in between that's at least 5% higher
-                                mask = (recent_df.index > date1) & (
-                                    recent_df.index < date2
-                                )
+                                mask = (recent_df.index > date1) & (recent_df.index < date2)
                                 if mask.any():
                                     max_between = recent_df.loc[mask, "high"].max()
                                     if max_between > price1 * 1.05:
                                         patterns.append(
                                             {
                                                 "type": "Double Bottom",
-                                                "start_date": date1.strftime(
-                                                    "%Y-%m-%d"
-                                                ),
+                                                "start_date": date1.strftime("%Y-%m-%d"),
                                                 "end_date": date2.strftime("%Y-%m-%d"),
-                                                "price_level": round(
-                                                    (price1 + price2) / 2, 2
-                                                ),
+                                                "price_level": round((price1 + price2) / 2, 2),
                                                 "confidence": "Medium",
                                             }
                                         )
@@ -301,22 +286,16 @@ class PatternRecognition:
                         if abs(price1 - price2) / price1 < 0.03:
                             days_apart = (date2 - date1).days
                             if days_apart >= 10 and days_apart <= 60:
-                                mask = (recent_df.index > date1) & (
-                                    recent_df.index < date2
-                                )
+                                mask = (recent_df.index > date1) & (recent_df.index < date2)
                                 if mask.any():
                                     min_between = recent_df.loc[mask, "low"].min()
                                     if min_between < price1 * 0.95:
                                         patterns.append(
                                             {
                                                 "type": "Double Top",
-                                                "start_date": date1.strftime(
-                                                    "%Y-%m-%d"
-                                                ),
+                                                "start_date": date1.strftime("%Y-%m-%d"),
                                                 "end_date": date2.strftime("%Y-%m-%d"),
-                                                "price_level": round(
-                                                    (price1 + price2) / 2, 2
-                                                ),
+                                                "price_level": round((price1 + price2) / 2, 2),
                                                 "confidence": "Medium",
                                             }
                                         )
@@ -349,7 +328,7 @@ class PatternRecognition:
             return {"patterns": patterns}
 
         except Exception as e:
-            raise Exception(f"Error detecting patterns: {str(e)}")
+            raise Exception(f"Error detecting patterns: {str(e)}") from e
 
 
 class RiskAnalysis:
@@ -362,7 +341,7 @@ class RiskAnalysis:
         risk_amount: float,
         account_size: float,
         max_risk_percent: float = 2.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Calculate appropriate position size based on risk parameters.
 
@@ -382,9 +361,7 @@ class RiskAnalysis:
                 raise ValueError("Price and account size must be positive")
 
             if price <= stop_price and stop_price != 0:
-                raise ValueError(
-                    "For long positions, stop price must be below entry price"
-                )
+                raise ValueError("For long positions, stop price must be below entry price")
 
             # Calculate risk per share
             risk_per_share = abs(price - stop_price)
@@ -418,9 +395,7 @@ class RiskAnalysis:
                 "dollar_risk": round(actual_dollar_risk, 2),
                 "risk_per_share": round(risk_per_share, 2),
                 "position_cost": round(position_cost, 2),
-                "account_percent_risked": round(
-                    (actual_dollar_risk / account_size) * 100, 2
-                ),
+                "account_percent_risked": round((actual_dollar_risk / account_size) * 100, 2),
                 "r_multiples": {
                     "r1": round(r1_target, 2),
                     "r2": round(r2_target, 2),
@@ -429,10 +404,10 @@ class RiskAnalysis:
             }
 
         except Exception as e:
-            raise Exception(f"Error calculating position size: {str(e)}")
+            raise Exception(f"Error calculating position size: {str(e)}") from e
 
     @staticmethod
-    def suggest_stop_levels(df: pd.DataFrame) -> Dict[str, float]:
+    def suggest_stop_levels(df: pd.DataFrame) -> dict[str, float]:
         """
         Suggest appropriate stop-loss levels based on technical indicators.
 
@@ -475,4 +450,4 @@ class RiskAnalysis:
             return stops
 
         except Exception as e:
-            raise Exception(f"Error suggesting stop levels: {str(e)}")
+            raise Exception(f"Error suggesting stop levels: {str(e)}") from e

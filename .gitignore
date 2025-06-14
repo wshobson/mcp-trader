@@ -11,3 +11,31 @@ wheels/
 
 # Environment variables
 .env
+
+# IDEs
+.vscode
+.idea
+.cursorrules
+
+# Testing
+.pytest_cache
+.coverage
+coverage.xml
+htmlcov/
+*.cover
+.hypothesis/
+.tox/
+.coverage.*
+
+# Documentation
+docs/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+.DS_Store
+
+# Test scripts
+run_tests.py
+test_*.py.bak

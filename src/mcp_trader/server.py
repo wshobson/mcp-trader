@@ -1,21 +1,44 @@
-import mcp.types as types
-import mcp.server.stdio
+#!/usr/bin/env python3
+"""
+MCP Trader Server - Technical analysis and trading tools for stocks and crypto.
+
+This server uses FastMCP for a modern, decorator-based implementation with
+context-aware features like logging, progress reporting, and caching.
+"""
+
 import asyncio
+import json
+import logging
+import uuid
+from datetime import datetime
+from typing import Any
 
-from mcp.server.models import InitializationOptions
-from mcp.server import NotificationOptions, Server
+from dotenv import load_dotenv
+from fastmcp import Context, FastMCP
 
-# Add our new imports
+# Import configuration
+from .config import config
+
+# Import our modules
 from .data import MarketData
 from .indicators import (
-    TechnicalAnalysis,
-    RelativeStrength,
-    VolumeProfile,
     PatternRecognition,
+    RelativeStrength,
     RiskAnalysis,
+    TechnicalAnalysis,
+    VolumeProfile,
 )
 
-# Initialize our service instances
+load_dotenv()
+
+# Configure logging - simple INFO level
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Initialize FastMCP server
+mcp = FastMCP(config.server_name)
+
+# Initialize service instances
 market_data = MarketData()
 tech_analysis = TechnicalAnalysis()
 rs_analysis = RelativeStrength()
@@ -23,196 +46,121 @@ volume_analysis = VolumeProfile()
 pattern_recognition = PatternRecognition()
 risk_analysis = RiskAnalysis()
 
-# Keep the server initialization
-server = Server("mcp-trader")
+
+# Context-aware helper functions
+def generate_request_id() -> str:
+    """Generate a unique request ID for tracking."""
+    return f"req_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
 
 
-@server.list_tools()
-async def handle_list_tools() -> list[types.Tool]:
-    """List our stock analysis tools."""
-    return [
-        types.Tool(
-            name="analyze-crypto",
-            description="Analyze a crypto asset's technical setup (supports Tiingo and Binance)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "symbol": {
-                        "type": "string",
-                        "description": "Crypto symbol (e.g., BTC, ETH, BTCUSDT for Binance)",
-                    },
-                    "provider": {
-                        "type": "string",
-                        "description": "Data provider: 'tiingo' or 'binance' (default: tiingo)",
-                        "default": "tiingo",
-                    },
-                    "lookback_days": {
-                        "type": "integer",
-                        "description": "Number of days to look back (default: 365)",
-                        "default": 365,
-                    },
-                    "quote_currency": {
-                        "type": "string",
-                        "description": "Quote currency (default: usd for Tiingo, USDT for Binance)",
-                        "default": "usd",
-                    }
-                },
-                "required": ["symbol"],
-            },
-        ),
-        types.Tool(
-            name="analyze-stock",
-            description="Analyze a stock's technical setup",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "symbol": {
-                        "type": "string",
-                        "description": "Stock symbol (e.g., NVDA)",
-                    }
-                },
-                "required": ["symbol"],
-            },
-        ),
-        types.Tool(
-            name="relative-strength",
-            description="Calculate a stock's relative strength compared to benchmark",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "symbol": {
-                        "type": "string",
-                        "description": "Stock symbol to analyze",
-                    },
-                    "benchmark": {
-                        "type": "string",
-                        "description": "Benchmark symbol (default: SPY)",
-                        "default": "SPY",
-                    },
-                },
-                "required": ["symbol"],
-            },
-        ),
-        types.Tool(
-            name="volume-profile",
-            description="Analyze volume distribution by price",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "symbol": {
-                        "type": "string",
-                        "description": "Stock symbol to analyze",
-                    },
-                    "lookback_days": {
-                        "type": "integer",
-                        "description": "Number of days to analyze",
-                        "default": 60,
-                    },
-                },
-                "required": ["symbol"],
-            },
-        ),
-        types.Tool(
-            name="detect-patterns",
-            description="Detect chart patterns in price data",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "symbol": {
-                        "type": "string",
-                        "description": "Stock symbol to analyze",
-                    }
-                },
-                "required": ["symbol"],
-            },
-        ),
-        types.Tool(
-            name="position-size",
-            description="Calculate optimal position size based on risk parameters",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "symbol": {"type": "string", "description": "Stock symbol"},
-                    "price": {
-                        "type": "number",
-                        "description": "Entry price (0 for current price)",
-                    },
-                    "stop_price": {"type": "number", "description": "Stop loss price"},
-                    "risk_amount": {
-                        "type": "number",
-                        "description": "Dollar amount to risk",
-                    },
-                    "account_size": {
-                        "type": "number",
-                        "description": "Total account size in dollars",
-                    },
-                },
-                "required": ["symbol", "stop_price", "risk_amount", "account_size"],
-            },
-        ),
-        types.Tool(
-            name="suggest-stops",
-            description="Suggest stop loss levels based on technical analysis",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "symbol": {
-                        "type": "string",
-                        "description": "Stock symbol to analyze",
-                    }
-                },
-                "required": ["symbol"],
-            },
-        ),
-    ]
+async def log_request_start(ctx: Context, tool_name: str, params: dict[str, Any]) -> str:
+    """Log the start of a request with context."""
+    request_id = generate_request_id()
+    ctx.log(f"[{request_id}] Starting {tool_name} with params: {params}")
+    return request_id
 
 
-@server.call_tool()
-async def handle_call_tool(
-    name: str, arguments: dict | None
-) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
-    """Handle tool execution requests."""
-    if not arguments:
-        raise ValueError("Missing arguments")
+async def log_request_end(
+    ctx: Context, request_id: str, tool_name: str, success: bool, message: str = ""
+):
+    """Log the end of a request with context."""
+    status = "SUCCESS" if success else "FAILED"
+    ctx.log(f"[{request_id}] {tool_name} {status}{f': {message}' if message else ''}")
+
+
+async def handle_error(ctx: Context, request_id: str, tool_name: str, error: Exception) -> str:
+    """Handle and log errors with context."""
+    error_msg = f"Error in {tool_name}: {str(error)}"
+    ctx.log(f"[{request_id}] ERROR: {error_msg}", level="error")
+
+    # Log additional error details for debugging
+    if hasattr(error, "__traceback__"):
+        import traceback
+
+        tb_lines = traceback.format_tb(error.__traceback__)
+        ctx.log(f"[{request_id}] Traceback: {''.join(tb_lines)}", level="debug")
+
+    return error_msg
+
+
+# Tools Implementation
+@mcp.tool()
+async def analyze_crypto(
+    ctx: Context,
+    symbol: str,
+    provider: str | None = None,
+    lookback_days: int = 365,
+    quote_currency: str = "usd",
+) -> str:
+    """
+    Analyze a crypto asset's technical setup (supports Tiingo and Binance).
+
+    Args:
+        symbol: Crypto symbol (e.g., BTC, ETH, BTCUSDT for Binance)
+        provider: Data provider - 'tiingo' or 'binance' (default: from config)
+        lookback_days: Number of days to look back (default: 365)
+        quote_currency: Quote currency (default: usd for Tiingo, USDT for Binance)
+    """
+    # Use Tiingo as default if not specified
+    if provider is None:
+        provider = "tiingo"
+
+    request_id = await log_request_start(
+        ctx,
+        "analyze_crypto",
+        {
+            "symbol": symbol,
+            "provider": provider,
+            "lookback_days": lookback_days,
+            "quote_currency": quote_currency,
+        },
+    )
 
     try:
-        # New analyze-crypto tool
-        if name == "analyze-crypto":
-            symbol = arguments.get("symbol")
-            provider = arguments.get("provider", "tiingo")
-            lookback_days = arguments.get("lookback_days", 365)
-            quote_currency = arguments.get("quote_currency", "usd")
+        # Report progress - fetching data
+        ctx.report_progress(0.2, f"Fetching {symbol} data from {provider}...")
+        ctx.log(f"[{request_id}] Fetching historical data for {symbol}")
 
-            if not symbol:
-                raise ValueError("Missing symbol")
+        # Fetch crypto data
+        df = await market_data.get_crypto_historical_data(
+            symbol=symbol,
+            lookback_days=lookback_days,
+            provider=provider,
+            quote_currency=quote_currency,
+        )
 
-            # Fetch crypto data
-            df = await market_data.get_crypto_historical_data(
-                symbol=symbol,
-                lookback_days=lookback_days,
-                provider=provider,
-                quote_currency=quote_currency
-            )
+        ctx.log(f"[{request_id}] Retrieved {len(df)} data points")
 
-            # Add indicators (reuse stock technical analysis for now)
-            df = tech_analysis.add_core_indicators(df)
+        # Report progress - adding indicators
+        ctx.report_progress(0.5, "Calculating technical indicators...")
+        ctx.log(f"[{request_id}] Adding technical indicators")
 
-            # Get trend status
-            trend = tech_analysis.check_trend_status(df)
+        # Add indicators
+        df = tech_analysis.add_core_indicators(df)
 
-            analysis = f"""
+        # Report progress - analyzing trends
+        ctx.report_progress(0.8, "Analyzing trend status...")
+        ctx.log(f"[{request_id}] Checking trend status")
+
+        # Get trend status
+        trend = tech_analysis.check_trend_status(df)
+
+        # Report completion
+        ctx.report_progress(1.0, "Analysis complete!")
+
+        analysis = f"""
 Technical Analysis for {symbol} ({provider.title()}):
 
 Trend Analysis:
-- Above 20 SMA: {"✅ " if trend["above_20sma"] else "❌ "}
-- Above 50 SMA: {"✅ " if trend["above_50sma"] else "❌ "}
-- Above 200 SMA: {"✅ " if trend["above_200sma"] else "❌ "}
-- 20/50 SMA Bullish Cross: {"✅ " if trend["20_50_bullish"] else "❌ "}
-- 50/200 SMA Bullish Cross: {"✅ " if trend["50_200_bullish"] else "❌ "}
+- Above 20 SMA: {"✅" if trend["above_20sma"] else "❌"}
+- Above 50 SMA: {"✅" if trend["above_50sma"] else "❌"}
+- Above 200 SMA: {"✅" if trend["above_200sma"] else "❌"}
+- 20/50 SMA Bullish Cross: {"✅" if trend["20_50_bullish"] else "❌"}
+- 50/200 SMA Bullish Cross: {"✅" if trend["50_200_bullish"] else "❌"}
 
 Momentum:
 - RSI (14): {trend["rsi"]:.2f}
-- MACD Bullish: {"✅ " if trend["macd_bullish"] else "❌ "}
+- MACD Bullish: {"✅" if trend["macd_bullish"] else "❌"}
 
 Latest Price: {df["close"].iloc[-1]:.6f}
 Average True Range (14): {df["atr"].iloc[-1]:.6f}
@@ -220,36 +168,68 @@ Average Daily Range Percentage: {df["adrp"].iloc[-1]:.2f}%
 Average Volume (20D): {df["volume"].iloc[-20:].mean():.2f}
 """
 
-            return [types.TextContent(type="text", text=analysis)]
+        await log_request_end(
+            ctx, request_id, "analyze_crypto", True, f"Successfully analyzed {symbol}"
+        )
 
-        # Original analyze-stock tool
-        if name == "analyze-stock":
-            symbol = arguments.get("symbol")
-            if not symbol:
-                raise ValueError("Missing symbol")
+        return analysis
 
-            # Fetch data
-            df = await market_data.get_historical_data(symbol)
+    except Exception as e:
+        error_msg = await handle_error(ctx, request_id, "analyze_crypto", e)
+        return f"Error analyzing {symbol}: {error_msg}"
 
-            # Add indicators
-            df = tech_analysis.add_core_indicators(df)
 
-            # Get trend status
-            trend = tech_analysis.check_trend_status(df)
+@mcp.tool()
+async def analyze_stock(ctx: Context, symbol: str) -> str:
+    """
+    Analyze a stock's technical setup.
 
-            analysis = f"""
+    Args:
+        symbol: Stock symbol (e.g., NVDA)
+    """
+
+    request_id = await log_request_start(ctx, "analyze_stock", {"symbol": symbol})
+
+    try:
+        # Report progress - fetching data
+        ctx.report_progress(0.2, f"Fetching {symbol} stock data...")
+        ctx.log(f"[{request_id}] Fetching historical data for {symbol}")
+
+        # Fetch data
+        df = await market_data.get_historical_data(symbol)
+
+        ctx.log(f"[{request_id}] Retrieved {len(df)} data points")
+
+        # Report progress - adding indicators
+        ctx.report_progress(0.5, "Calculating technical indicators...")
+        ctx.log(f"[{request_id}] Adding technical indicators")
+
+        # Add indicators
+        df = tech_analysis.add_core_indicators(df)
+
+        # Report progress - analyzing trends
+        ctx.report_progress(0.8, "Analyzing trend status...")
+        ctx.log(f"[{request_id}] Checking trend status")
+
+        # Get trend status
+        trend = tech_analysis.check_trend_status(df)
+
+        # Report completion
+        ctx.report_progress(1.0, "Analysis complete!")
+
+        analysis = f"""
 Technical Analysis for {symbol}:
 
 Trend Analysis:
-- Above 20 SMA: {"✅ " if trend["above_20sma"] else "❌ "}
-- Above 50 SMA: {"✅ " if trend["above_50sma"] else "❌ "}
-- Above 200 SMA: {"✅ " if trend["above_200sma"] else "❌ "}
-- 20/50 SMA Bullish Cross: {"✅ " if trend["20_50_bullish"] else "❌ "}
-- 50/200 SMA Bullish Cross: {"✅ " if trend["50_200_bullish"] else "❌ "}
+- Above 20 SMA: {"✅" if trend["above_20sma"] else "❌"}
+- Above 50 SMA: {"✅" if trend["above_50sma"] else "❌"}
+- Above 200 SMA: {"✅" if trend["above_200sma"] else "❌"}
+- 20/50 SMA Bullish Cross: {"✅" if trend["20_50_bullish"] else "❌"}
+- 50/200 SMA Bullish Cross: {"✅" if trend["50_200_bullish"] else "❌"}
 
 Momentum:
 - RSI (14): {trend["rsi"]:.2f}
-- MACD Bullish: {"✅ " if trend["macd_bullish"] else "❌ "}
+- MACD Bullish: {"✅" if trend["macd_bullish"] else "❌"}
 
 Latest Price: ${df["close"].iloc[-1]:.2f}
 Average True Range (14): {df["atr"].iloc[-1]:.2f}
@@ -257,94 +237,121 @@ Average Daily Range Percentage: {df["adrp"].iloc[-1]:.2f}%
 Average Volume (20D): {int(df["avg_20d_vol"].iloc[-1])}
 """
 
-            return [types.TextContent(type="text", text=analysis)]
+        await log_request_end(
+            ctx, request_id, "analyze_stock", True, f"Successfully analyzed {symbol}"
+        )
 
-        # Relative Strength Analysis
-        elif name == "relative-strength":
-            symbol = arguments.get("symbol")
-            benchmark = arguments.get("benchmark", "SPY")
+        return analysis
 
-            if not symbol:
-                raise ValueError("Missing symbol")
+    except Exception as e:
+        error_msg = await handle_error(ctx, request_id, "analyze_stock", e)
+        return f"Error analyzing {symbol}: {error_msg}"
 
-            # Calculate relative strength
-            rs_results = await rs_analysis.calculate_rs(market_data, symbol, benchmark)
 
-            # Format the results
-            rs_text = f"""
+@mcp.tool()
+async def relative_strength(ctx: Context, symbol: str, benchmark: str = "SPY") -> str:
+    """
+    Calculate a stock's relative strength compared to benchmark.
+
+    Args:
+        symbol: Stock symbol to analyze
+        benchmark: Benchmark symbol (default: SPY)
+    """
+    request_id = await log_request_start(
+        ctx, "relative_strength", {"symbol": symbol, "benchmark": benchmark}
+    )
+
+    try:
+        # Report progress
+        ctx.report_progress(0.3, f"Calculating relative strength of {symbol} vs {benchmark}...")
+        ctx.log(f"[{request_id}] Starting relative strength calculation")
+        # Calculate relative strength
+        rs_results = await rs_analysis.calculate_rs(market_data, symbol, benchmark)
+
+        ctx.report_progress(0.8, "Formatting results...")
+        ctx.log(f"[{request_id}] Calculated RS scores for multiple periods")
+
+        # Format the results
+        rs_text = f"""
 Relative Strength Analysis for {symbol} vs {benchmark}:
 
 """
-            # Check if we have any results
-            if not rs_results:
-                rs_text += "Insufficient historical data to calculate relative strength metrics."
-                return [types.TextContent(type="text", text=rs_text)]
+        # Check if we have any results
+        if not rs_results:
+            rs_text += "Insufficient historical data to calculate relative strength metrics."
+            return rs_text
 
-            for period, score in rs_results.items():
-                if period.startswith("RS_"):
-                    days = period.split("_")[1]
-                    rs_text += f"- {days} Relative Strength: {score}"
+        for period, score in rs_results.items():
+            if period.startswith("RS_"):
+                days = period.split("_")[1]
+                rs_text += f"- {days} Relative Strength: {score}"
 
-                    # Add classification
-                    if score >= 80:
-                        rs_text += " (Strong Outperformance) ⭐⭐⭐"
-                    elif score >= 65:
-                        rs_text += " (Moderate Outperformance) ⭐⭐"
-                    elif score >= 50:
-                        rs_text += " (Slight Outperformance) ⭐"
-                    elif score >= 35:
-                        rs_text += " (Slight Underperformance) ⚠️"
-                    elif score >= 20:
-                        rs_text += " (Moderate Underperformance) ⚠️⚠️"
-                    else:
-                        rs_text += " (Strong Underperformance) ⚠️⚠️⚠️"
+                # Add classification
+                if score >= 80:
+                    rs_text += " (Strong Outperformance) ⭐⭐⭐"
+                elif score >= 65:
+                    rs_text += " (Moderate Outperformance) ⭐⭐"
+                elif score >= 50:
+                    rs_text += " (Slight Outperformance) ⭐"
+                elif score >= 35:
+                    rs_text += " (Slight Underperformance) ⚠️"
+                elif score >= 20:
+                    rs_text += " (Moderate Underperformance) ⚠️⚠️"
+                else:
+                    rs_text += " (Strong Underperformance) ⚠️⚠️⚠️"
 
-                    rs_text += "\n"
+                rs_text += "\n"
 
-            rs_text += "\nPerformance Details:\n"
+        rs_text += "\nPerformance Details:\n"
 
-            for period in ["21d", "63d", "126d", "252d"]:
-                # Check if we have data for this period
-                if (
-                    f"Return_{period}" not in rs_results
-                    or f"Benchmark_{period}" not in rs_results
-                    or f"Excess_{period}" not in rs_results
-                ):
-                    continue
+        for period in ["21d", "63d", "126d", "252d"]:
+            stock_return = rs_results.get(f"Return_{period}")
+            benchmark_return = rs_results.get(f"Benchmark_{period}")
+            excess = rs_results.get(f"Excess_{period}")
 
-                stock_return = rs_results.get(f"Return_{period}")
-                benchmark_return = rs_results.get(f"Benchmark_{period}")
-                excess = rs_results.get(f"Excess_{period}")
+            if all(x is not None for x in [stock_return, benchmark_return, excess]):
+                rs_text += f"- {period}: {symbol} {stock_return:+.2f}% vs {benchmark} {benchmark_return:+.2f}% = {excess:+.2f}%\n"
 
-                if (
-                    stock_return is not None
-                    and benchmark_return is not None
-                    and excess is not None
-                ):
-                    rs_text += f"- {period}: {symbol} {stock_return:+.2f}% vs {benchmark} {benchmark_return:+.2f}% = {excess:+.2f}%\n"
+        ctx.report_progress(1.0, "Analysis complete!")
+        await log_request_end(
+            ctx, request_id, "relative_strength", True, f"Calculated RS for {symbol} vs {benchmark}"
+        )
+        return rs_text
 
-            # If no performance details were added
-            if "\nPerformance Details:\n" == rs_text.split("\n")[-2] + "\n":
-                rs_text += "No performance details available due to insufficient historical data.\n"
+    except Exception as e:
+        error_msg = await handle_error(ctx, request_id, "relative_strength", e)
+        return f"Error calculating relative strength: {error_msg}"
 
-            return [types.TextContent(type="text", text=rs_text)]
 
-        # Volume Profile Analysis
-        elif name == "volume-profile":
-            symbol = arguments.get("symbol")
-            lookback_days = arguments.get("lookback_days", 60)
+@mcp.tool()
+async def volume_profile(ctx: Context, symbol: str, lookback_days: int = 60) -> str:
+    """
+    Analyze volume distribution by price.
 
-            if not symbol:
-                raise ValueError("Missing symbol")
+    Args:
+        symbol: Stock symbol to analyze
+        lookback_days: Number of days to analyze
+    """
+    request_id = await log_request_start(
+        ctx, "volume_profile", {"symbol": symbol, "lookback_days": lookback_days}
+    )
 
-            # Get historical data
-            df = await market_data.get_historical_data(symbol, lookback_days + 10)
+    try:
+        ctx.report_progress(0.2, f"Fetching {lookback_days} days of data for {symbol}...")
+        ctx.log(f"[{request_id}] Fetching historical data")
+        # Get historical data
+        df = await market_data.get_historical_data(symbol, lookback_days + 10)
 
-            # Analyze volume profile
-            profile = volume_analysis.analyze_volume_profile(df.tail(lookback_days))
+        ctx.report_progress(0.6, "Analyzing volume distribution...")
+        ctx.log(f"[{request_id}] Analyzing volume profile")
 
-            # Format the results
-            profile_text = f"""
+        # Analyze volume profile
+        profile = volume_analysis.analyze_volume_profile(df.tail(lookback_days))
+
+        ctx.report_progress(0.9, "Formatting results...")
+
+        # Format the results
+        profile_text = f"""
 Volume Profile Analysis for {symbol} (last {lookback_days} days):
 
 Point of Control (POC): ${profile["point_of_control"]} (Price level with highest volume)
@@ -353,79 +360,139 @@ Value Area: ${profile["value_area_low"]} - ${profile["value_area_high"]} (70% of
 Volume by Price Level (High to Low):
 """
 
-            # Sort bins by volume and format
-            sorted_bins = sorted(
-                profile["bins"], key=lambda x: x["volume"], reverse=True
+        # Sort bins by volume and format
+        sorted_bins = sorted(profile["bins"], key=lambda x: x["volume"], reverse=True)
+        for i, bin_data in enumerate(sorted_bins[:5]):  # Show top 5 volume levels
+            profile_text += f"{i + 1}. ${bin_data['price_low']} - ${bin_data['price_high']}: {bin_data['volume_percent']:.1f}% of volume\n"
+
+        ctx.report_progress(1.0, "Analysis complete!")
+        await log_request_end(
+            ctx, request_id, "volume_profile", True, f"Analyzed volume profile for {symbol}"
+        )
+        return profile_text
+
+    except Exception as e:
+        error_msg = await handle_error(ctx, request_id, "volume_profile", e)
+        return f"Error analyzing volume profile: {error_msg}"
+
+
+@mcp.tool()
+async def detect_patterns(ctx: Context, symbol: str) -> str:
+    """
+    Detect chart patterns in price data.
+
+    Args:
+        symbol: Stock symbol to analyze
+    """
+
+    request_id = await log_request_start(ctx, "detect_patterns", {"symbol": symbol})
+
+    try:
+        ctx.report_progress(0.2, "Fetching data for pattern detection...")
+        ctx.log(f"[{request_id}] Fetching 90 days of historical data")
+        # Get historical data
+        df = await market_data.get_historical_data(symbol, lookback_days=90)
+
+        ctx.report_progress(0.6, "Scanning for chart patterns...")
+        ctx.log(f"[{request_id}] Running pattern detection algorithms")
+
+        # Detect patterns
+        pattern_results = pattern_recognition.detect_patterns(df)
+
+        ctx.report_progress(0.9, "Formatting pattern results...")
+
+        # Format the results
+        if not pattern_results["patterns"]:
+            pattern_text = (
+                f"No significant chart patterns detected for {symbol} in the recent data."
             )
-            for i, bin_data in enumerate(sorted_bins[:5]):  # Show top 5 volume levels
-                profile_text += f"{i + 1}. ${bin_data['price_low']} - ${bin_data['price_high']}: {bin_data['volume_percent']:.1f}% of volume\n"
+        else:
+            pattern_text = f"Chart Patterns Detected for {symbol}:\n\n"
 
-            return [types.TextContent(type="text", text=profile_text)]
+            for pattern in pattern_results["patterns"]:
+                pattern_text += f"- {pattern['type']}"
 
-        # Pattern Recognition
-        elif name == "detect-patterns":
-            symbol = arguments.get("symbol")
+                if "start_date" in pattern and "end_date" in pattern:
+                    pattern_text += f" ({pattern['start_date']} to {pattern['end_date']})"
 
-            if not symbol:
-                raise ValueError("Missing symbol")
+                pattern_text += f": Price level ${pattern['price_level']}"
 
-            # Get historical data
-            df = await market_data.get_historical_data(symbol, lookback_days=90)
+                if "confidence" in pattern:
+                    pattern_text += f" (Confidence: {pattern['confidence']})"
 
-            # Detect patterns
-            pattern_results = pattern_recognition.detect_patterns(df)
+                pattern_text += "\n"
 
-            # Format the results
-            if not pattern_results["patterns"]:
-                pattern_text = f"No significant chart patterns detected for {symbol} in the recent data."
-            else:
-                pattern_text = f"Chart Patterns Detected for {symbol}:\n\n"
+            pattern_text += "\nNote: Pattern recognition is not 100% reliable and should be confirmed with other forms of analysis."
 
-                for pattern in pattern_results["patterns"]:
-                    pattern_text += f"- {pattern['type']}"
+        ctx.report_progress(1.0, "Pattern detection complete!")
+        patterns_found = len(pattern_results.get("patterns", []))
+        await log_request_end(
+            ctx,
+            request_id,
+            "detect_patterns",
+            True,
+            f"Found {patterns_found} patterns for {symbol}",
+        )
+        return pattern_text
 
-                    if "start_date" in pattern and "end_date" in pattern:
-                        pattern_text += (
-                            f" ({pattern['start_date']} to {pattern['end_date']})"
-                        )
+    except Exception as e:
+        error_msg = await handle_error(ctx, request_id, "detect_patterns", e)
+        return f"Error detecting patterns: {error_msg}"
 
-                    pattern_text += f": Price level ${pattern['price_level']}"
 
-                    if "confidence" in pattern:
-                        pattern_text += f" (Confidence: {pattern['confidence']})"
+@mcp.tool()
+async def position_size(
+    ctx: Context,
+    symbol: str,
+    stop_price: float,
+    risk_amount: float,
+    account_size: float,
+    price: float = 0,
+) -> str:
+    """
+    Calculate optimal position size based on risk parameters.
 
-                    pattern_text += "\n"
+    Args:
+        symbol: Stock symbol
+        stop_price: Stop loss price
+        risk_amount: Dollar amount to risk
+        account_size: Total account size in dollars
+        price: Entry price (0 for current price)
+    """
 
-                pattern_text += "\nNote: Pattern recognition is not 100% reliable and should be confirmed with other forms of analysis."
+    request_id = await log_request_start(
+        ctx,
+        "position_size",
+        {
+            "symbol": symbol,
+            "stop_price": stop_price,
+            "risk_amount": risk_amount,
+            "account_size": account_size,
+            "price": price,
+        },
+    )
 
-            return [types.TextContent(type="text", text=pattern_text)]
+    try:
+        # If price is 0, get the current price
+        if price == 0:
+            ctx.report_progress(0.2, "Fetching current price...")
+            ctx.log(f"[{request_id}] Fetching current price for {symbol}")
+            df = await market_data.get_historical_data(symbol, lookback_days=5)
+            price = df["close"].iloc[-1]
+            ctx.log(f"[{request_id}] Current price: ${price:.2f}")
 
-        # Position Sizing
-        elif name == "position-size":
-            symbol = arguments.get("symbol")
-            price = arguments.get("price", 0)
-            stop_price = arguments.get("stop_price")
-            risk_amount = arguments.get("risk_amount")
-            account_size = arguments.get("account_size")
+        ctx.report_progress(0.6, "Calculating position size...")
 
-            if not all([symbol, stop_price, risk_amount, account_size]):
-                raise ValueError("Missing required parameters")
+        # Calculate position size
+        position_results = risk_analysis.calculate_position_size(
+            price=price,
+            stop_price=stop_price,
+            risk_amount=risk_amount,
+            account_size=account_size,
+        )
 
-            # If price is 0, get the current price
-            if price == 0:
-                df = await market_data.get_historical_data(symbol, lookback_days=5)
-                price = df["close"].iloc[-1]
-
-            # Calculate position size
-            position_results = risk_analysis.calculate_position_size(
-                price=price,
-                stop_price=stop_price,
-                risk_amount=risk_amount,
-                account_size=account_size,
-            )
-
-            # Format the results
-            position_text = f"""
+        # Format the results
+        position_text = f"""
 Position Sizing for {symbol} at ${price:.2f}:
 
 📊 Recommended Position:
@@ -440,29 +507,54 @@ Position Sizing for {symbol} at ${price:.2f}:
 
 Remember what Ramada said: "Good trades don't just happen, they're the result of careful planning!"
 """
+        ctx.report_progress(1.0, "Position sizing complete!")
+        await log_request_end(
+            ctx,
+            request_id,
+            "position_size",
+            True,
+            f"Calculated position size: {position_results['recommended_shares']} shares",
+        )
+        return position_text
 
-            return [types.TextContent(type="text", text=position_text)]
+    except Exception as e:
+        error_msg = await handle_error(ctx, request_id, "position_size", e)
+        return f"Error calculating position size: {error_msg}"
 
-        # Suggest Stop Levels
-        elif name == "suggest-stops":
-            symbol = arguments.get("symbol")
 
-            if not symbol:
-                raise ValueError("Missing symbol")
+@mcp.tool()
+async def suggest_stops(ctx: Context, symbol: str) -> str:
+    """
+    Suggest stop loss levels based on technical analysis.
 
-            # Get historical data
-            df = await market_data.get_historical_data(symbol, lookback_days=60)
+    Args:
+        symbol: Stock symbol to analyze
+    """
 
-            # Add indicators
-            df = tech_analysis.add_core_indicators(df)
+    request_id = await log_request_start(ctx, "suggest_stops", {"symbol": symbol})
 
-            # Get stop suggestions
-            stops = risk_analysis.suggest_stop_levels(df)
+    try:
+        ctx.report_progress(0.2, "Fetching data for stop analysis...")
+        ctx.log(f"[{request_id}] Fetching 60 days of historical data")
+        # Get historical data
+        df = await market_data.get_historical_data(symbol, lookback_days=60)
 
-            latest_close = df["close"].iloc[-1]
+        ctx.report_progress(0.4, "Calculating technical indicators...")
+        ctx.log(f"[{request_id}] Adding technical indicators")
 
-            # Format the results
-            stops_text = f"""
+        # Add indicators
+        df = tech_analysis.add_core_indicators(df)
+
+        ctx.report_progress(0.7, "Analyzing stop levels...")
+        ctx.log(f"[{request_id}] Calculating suggested stop levels")
+
+        # Get stop suggestions
+        stops = risk_analysis.suggest_stop_levels(df)
+
+        latest_close = df["close"].iloc[-1]
+
+        # Format the results
+        stops_text = f"""
 Suggested Stop Levels for {symbol} (Current Price: ${latest_close:.2f}):
 
 ATR-Based Stops:
@@ -478,94 +570,137 @@ Percentage-Based Stops:
 Technical Levels:
 """
 
-            if "sma_20" in stops:
-                stops_text += f"- 20-day SMA: ${stops['sma_20']:.2f} ({((latest_close - stops['sma_20']) / latest_close * 100):.2f}% from current price)\n"
+        if "sma_20" in stops:
+            stops_text += f"- 20-day SMA: ${stops['sma_20']:.2f} ({((latest_close - stops['sma_20']) / latest_close * 100):.2f}% from current price)\n"
 
-            if "sma_50" in stops:
-                stops_text += f"- 50-day SMA: ${stops['sma_50']:.2f} ({((latest_close - stops['sma_50']) / latest_close * 100):.2f}% from current price)\n"
+        if "sma_50" in stops:
+            stops_text += f"- 50-day SMA: ${stops['sma_50']:.2f} ({((latest_close - stops['sma_50']) / latest_close * 100):.2f}% from current price)\n"
 
-            if "sma_200" in stops:
-                stops_text += f"- 200-day SMA: ${stops['sma_200']:.2f} ({((latest_close - stops['sma_200']) / latest_close * 100):.2f}% from current price)\n"
+        if "sma_200" in stops:
+            stops_text += f"- 200-day SMA: ${stops['sma_200']:.2f} ({((latest_close - stops['sma_200']) / latest_close * 100):.2f}% from current price)\n"
 
-            if "recent_swing" in stops:
-                stops_text += f"- Recent Swing Low: ${stops['recent_swing']:.2f} ({((latest_close - stops['recent_swing']) / latest_close * 100):.2f}% from current price)\n"
+        if "recent_swing" in stops:
+            stops_text += f"- Recent Swing Low: ${stops['recent_swing']:.2f} ({((latest_close - stops['recent_swing']) / latest_close * 100):.2f}% from current price)\n"
 
-            return [types.TextContent(type="text", text=stops_text)]
-
-        else:
-            raise ValueError(f"Unknown tool: {name}")
+        ctx.report_progress(1.0, "Stop analysis complete!")
+        await log_request_end(
+            ctx,
+            request_id,
+            "suggest_stops",
+            True,
+            f"Suggested stop levels for {symbol} at ${latest_close:.2f}",
+        )
+        return stops_text
 
     except Exception as e:
-        return [
-            types.TextContent(
-                type="text", text=f"\n<observation>\nError: {str(e)}\n</observation>\n"
-            )
-        ]
+        error_msg = await handle_error(ctx, request_id, "suggest_stops", e)
+        return f"Error suggesting stops: {error_msg}"
 
 
-# Keep the main function as is
-async def main():
-    async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream,
-            write_stream,
-            InitializationOptions(
-                server_name="mcp-trader",
-                server_version="0.1.0",
-                capabilities=server.get_capabilities(
-                    notification_options=NotificationOptions(),
-                    experimental_capabilities={},
-                ),
-            ),
-        )
+# Startup logging
+def log_startup():
+    """Log startup information."""
+    logger.info("MCP Trader Server starting up...")
+    logger.info(f"Server name: {config.server_name}")
+    logger.info("Transport: stdio")
+    logger.info("All features enabled: crypto, patterns, risk_tools")
+
+    # Check for API keys
+    if config.tiingo_api_key:
+        logger.info("Tiingo API key configured")
+    else:
+        logger.warning("No Tiingo API key configured")
+
+    if config.binance_api_key:
+        logger.info("Binance API credentials configured")
+
+    logger.info("MCP Trader Server ready to handle requests!")
 
 
-# Add a standalone HTTP server for testing
-async def run_http_server():
+# Add system status resource
+@mcp.resource("mcp://system/status")
+async def get_system_status(ctx: Context) -> str:
+    """Get current system status and statistics."""
+    ctx.log("Generating system status report", level="debug")
+
+    status = {
+        "server": "MCP Trader Server",
+        "version": "2.0.0",
+        "status": "operational",
+        "timestamp": datetime.now().isoformat(),
+        "environment": {
+            "tiingo_api_key": "configured" if config.tiingo_api_key else "not configured",
+            "binance_api_key": "configured" if config.binance_api_key else "not configured",
+        },
+        "services": {
+            "market_data": "ready",
+            "technical_analysis": "ready",
+            "relative_strength": "ready",
+            "volume_profile": "ready",
+            "pattern_recognition": "ready",
+            "risk_analysis": "ready",
+        },
+    }
+
+    return json.dumps(status, indent=2)
+
+
+# Main function
+def main():
+    """Main entry point for the MCP server."""
+    log_startup()
+    mcp.run()
+
+
+# HTTP server mode (for testing and alternative deployment)
+async def run_http_test_server():
     """Run a standalone HTTP server for testing purposes."""
     from aiohttp import web
 
-    # Initialize our data and analysis modules
-    global \
-        market_data, \
-        tech_analysis, \
-        rs_analysis, \
-        pattern_recognition, \
-        volume_analysis, \
-        risk_analysis
-    market_data = MarketData()
-    tech_analysis = TechnicalAnalysis()
-    rs_analysis = RelativeStrength()
-    pattern_recognition = PatternRecognition()
-    volume_analysis = VolumeProfile()
-    risk_analysis = RiskAnalysis()
-
     app = web.Application()
 
-    async def list_tools_handler(request):
-        tools = await handle_list_tools()
+    async def list_tools_handler(_):
+        tools = []
+        for name, tool in mcp._tools.items():
+            tools.append(
+                {
+                    "name": name,
+                    "description": tool.__doc__ or "",
+                    "inputSchema": {"type": "object", "properties": {}},
+                }
+            )
         return web.json_response(tools)
 
-    async def call_tool_handler(request):
-        data = await request.json()
+    async def call_tool_handler(req):
+        data = await req.json()
         name = data.get("name")
         arguments = data.get("arguments", {})
 
-        result = await handle_call_tool(name, arguments)
+        # Call FastMCP tool
+        tool_func = mcp._tools.get(name)
+        if not tool_func:
+            return web.json_response({"error": f"Unknown tool: {name}"}, status=404)
 
-        # Convert the result to a JSON-serializable format
-        response_data = []
-        for item in result:
-            if item.type == "text":
-                response_data.append({"type": "text", "text": item.text})
-            # Add other content types as needed
+        # Create a mock context
+        class MockContext:
+            def log(self, msg, level="info"):
+                logger.log(getattr(logging, level.upper()), msg)
 
-        return web.json_response(response_data)
+            def report_progress(self, progress, message=""):
+                logger.info(f"Progress: {progress * 100:.0f}% - {message}")
+
+        ctx = MockContext()
+
+        try:
+            result = await tool_func(ctx, **arguments)
+            return web.json_response({"type": "text", "text": result})
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
 
     app.router.add_get("/list-tools", list_tools_handler)
     app.router.add_post("/call-tool", call_tool_handler)
 
-    print("Starting HTTP server on http://localhost:8000")
+    logger.info("Starting HTTP test server on http://localhost:8000")
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "localhost", 8000)
@@ -573,15 +708,15 @@ async def run_http_server():
 
     # Keep the server running
     while True:
-        await asyncio.sleep(3600)  # Sleep for an hour
+        await asyncio.sleep(3600)
 
 
 if __name__ == "__main__":
     import sys
 
     if len(sys.argv) > 1 and sys.argv[1] == "--http":
-        # Run as HTTP server
-        asyncio.run(run_http_server())
+        # Run as HTTP test server
+        asyncio.run(run_http_test_server())
     else:
         # Run as MCP server
-        asyncio.run(main())
+        main()

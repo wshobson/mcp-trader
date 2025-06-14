@@ -1,18 +1,36 @@
-import asyncio
-import pytest
+from unittest.mock import AsyncMock, patch
+
 import pandas as pd
-from unittest.mock import patch, AsyncMock
+import pytest
+
 from src.mcp_trader.data import MarketData
+
 
 @pytest.mark.asyncio
 async def test_get_crypto_historical_data_tiingo_success():
-    mock_response = [{
-        "ticker": "btcusd",
-        "priceData": [
-            {"date": "2024-05-01T00:00:00Z", "open": 60000, "high": 60500, "low": 59500, "close": 60200, "volume": 1000},
-            {"date": "2024-05-02T00:00:00Z", "open": 60200, "high": 61000, "low": 60000, "close": 60800, "volume": 1200}
-        ]
-    }]
+    mock_response = [
+        {
+            "ticker": "btcusd",
+            "priceData": [
+                {
+                    "date": "2024-05-01T00:00:00Z",
+                    "open": 60000,
+                    "high": 60500,
+                    "low": 59500,
+                    "close": 60200,
+                    "volume": 1000,
+                },
+                {
+                    "date": "2024-05-02T00:00:00Z",
+                    "open": 60200,
+                    "high": 61000,
+                    "low": 60000,
+                    "close": 60800,
+                    "volume": 1200,
+                },
+            ],
+        }
+    ]
     with patch("aiohttp.ClientSession.get") as mock_get:
         mock_session = AsyncMock()
         mock_response_obj = AsyncMock()
@@ -27,11 +45,38 @@ async def test_get_crypto_historical_data_tiingo_success():
         assert "open" in df.columns
         assert df.shape[0] == 2
 
+
 @pytest.mark.asyncio
 async def test_get_crypto_historical_data_binance_success():
     mock_response = [
-        [1714521600000, "60000", "60500", "59500", "60200", "1000", 1714607999999, "0", 0, "0", "0", "0"],
-        [1714608000000, "60200", "61000", "60000", "60800", "1200", 1714694399999, "0", 0, "0", "0", "0"]
+        [
+            1714521600000,
+            "60000",
+            "60500",
+            "59500",
+            "60200",
+            "1000",
+            1714607999999,
+            "0",
+            0,
+            "0",
+            "0",
+            "0",
+        ],
+        [
+            1714608000000,
+            "60200",
+            "61000",
+            "60000",
+            "60800",
+            "1200",
+            1714694399999,
+            "0",
+            0,
+            "0",
+            "0",
+            "0",
+        ],
     ]
     with patch("aiohttp.ClientSession.get") as mock_get:
         mock_session = AsyncMock()
@@ -47,6 +92,7 @@ async def test_get_crypto_historical_data_binance_success():
         assert "open" in df.columns
         assert df.shape[0] == 2
 
+
 @pytest.mark.asyncio
 async def test_get_crypto_historical_data_tiingo_no_data():
     mock_response = [{"ticker": "btcusd", "priceData": []}]
@@ -61,6 +107,7 @@ async def test_get_crypto_historical_data_tiingo_no_data():
         md = MarketData()
         with pytest.raises(ValueError):
             await md.get_crypto_historical_data("BTC", lookback_days=2, provider="tiingo")
+
 
 @pytest.mark.asyncio
 async def test_get_crypto_historical_data_binance_no_data():
