@@ -297,6 +297,12 @@ See pyproject.toml for full dependency list:
 - ta-lib >=0.6.0
 ```
 
+## Contributors
+
+- @wshobson
+- @zd87pl
+- @calclavia
+
 ## Contributing
 
 Contributions to MCP Trader are welcome! Here are some ways you can contribute:
