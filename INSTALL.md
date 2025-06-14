@@ -11,11 +11,6 @@ Using Homebrew:
 brew install ta-lib
 ```
 
-Using MacPorts:
-```bash
-sudo port install ta-lib
-```
-
 ### Linux (Ubuntu/Debian)
 
 ```bash
@@ -61,7 +56,7 @@ git clone https://github.com/yourusername/mcp-trader.git
 cd mcp-trader
 
 # Install Python dependencies
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 ## Troubleshooting
@@ -72,7 +67,7 @@ If you encounter issues on Apple Silicon:
 ```bash
 export TA_INCLUDE_PATH="$(brew --prefix ta-lib)/include"
 export TA_LIBRARY_PATH="$(brew --prefix ta-lib)/lib"
-pip install ta-lib
+uv pip install ta-lib
 ```
 
 ### Linux Library Path Issues
