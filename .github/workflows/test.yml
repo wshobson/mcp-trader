@@ -70,7 +70,7 @@ jobs:
         uv run pytest -v --cov=mcp_trader --cov-report=xml --cov-report=term
     
     - name: Upload coverage reports
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         file: ./coverage.xml
         flags: unittests
