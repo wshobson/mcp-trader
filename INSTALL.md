@@ -44,8 +44,8 @@ After installing the TA-Lib C library:
 git clone https://github.com/yourusername/mcp-trader.git
 cd mcp-trader
 
-# Install Python dependencies
-uv pip install -r requirements.txt
+# Install the project
+uv pip install -e .
 ```
 
 ## Troubleshooting
