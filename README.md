@@ -69,8 +69,6 @@ The server now supports FastMCP resources for direct market data access:
 - `market://cache/clear` - Clear the data cache
 - `market://cache/status` - View cache statistics
 
-Resources provide a RESTful-like interface with built-in caching (5-minute TTL) for improved performance. See [FASTMCP_RESOURCES.md](FASTMCP_RESOURCES.md) for detailed documentation.
-
 ### Data Sources
 
 - **Stocks**: [Tiingo API](https://api.tiingo.com/) for historical daily OHLCV data
