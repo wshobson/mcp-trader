@@ -299,9 +299,9 @@ See pyproject.toml for full dependency list:
 
 ## Contributors
 
-- @wshobson
-- @zd87pl
-- @calclavia
+- [@wshobson](https://github.com/wshobson)
+- [@zd87pl](https://github.com/zd87pl)
+- [@calclavia](https://github.com/calclavia)
 
 ## Contributing
 
