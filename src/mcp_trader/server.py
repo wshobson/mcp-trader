@@ -32,6 +32,35 @@ async def handle_list_tools() -> list[types.Tool]:
     """List our stock analysis tools."""
     return [
         types.Tool(
+            name="analyze-crypto",
+            description="Analyze a crypto asset's technical setup (supports Tiingo and Binance)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "Crypto symbol (e.g., BTC, ETH, BTCUSDT for Binance)",
+                    },
+                    "provider": {
+                        "type": "string",
+                        "description": "Data provider: 'tiingo' or 'binance' (default: tiingo)",
+                        "default": "tiingo",
+                    },
+                    "lookback_days": {
+                        "type": "integer",
+                        "description": "Number of days to look back (default: 365)",
+                        "default": 365,
+                    },
+                    "quote_currency": {
+                        "type": "string",
+                        "description": "Quote currency (default: usd for Tiingo, USDT for Binance)",
+                        "default": "usd",
+                    }
+                },
+                "required": ["symbol"],
+            },
+        ),
+        types.Tool(
             name="analyze-stock",
             description="Analyze a stock's technical setup",
             inputSchema={
@@ -147,6 +176,52 @@ async def handle_call_tool(
         raise ValueError("Missing arguments")
 
     try:
+        # New analyze-crypto tool
+        if name == "analyze-crypto":
+            symbol = arguments.get("symbol")
+            provider = arguments.get("provider", "tiingo")
+            lookback_days = arguments.get("lookback_days", 365)
+            quote_currency = arguments.get("quote_currency", "usd")
+
+            if not symbol:
+                raise ValueError("Missing symbol")
+
+            # Fetch crypto data
+            df = await market_data.get_crypto_historical_data(
+                symbol=symbol,
+                lookback_days=lookback_days,
+                provider=provider,
+                quote_currency=quote_currency
+            )
+
+            # Add indicators (reuse stock technical analysis for now)
+            df = tech_analysis.add_core_indicators(df)
+
+            # Get trend status
+            trend = tech_analysis.check_trend_status(df)
+
+            analysis = f"""
+Technical Analysis for {symbol} ({provider.title()}):
+
+Trend Analysis:
+- Above 20 SMA: {"✅ " if trend["above_20sma"] else "❌ "}
+- Above 50 SMA: {"✅ " if trend["above_50sma"] else "❌ "}
+- Above 200 SMA: {"✅ " if trend["above_200sma"] else "❌ "}
+- 20/50 SMA Bullish Cross: {"✅ " if trend["20_50_bullish"] else "❌ "}
+- 50/200 SMA Bullish Cross: {"✅ " if trend["50_200_bullish"] else "❌ "}
+
+Momentum:
+- RSI (14): {trend["rsi"]:.2f}
+- MACD Bullish: {"✅ " if trend["macd_bullish"] else "❌ "}
+
+Latest Price: {df["close"].iloc[-1]:.6f}
+Average True Range (14): {df["atr"].iloc[-1]:.6f}
+Average Daily Range Percentage: {df["adrp"].iloc[-1]:.2f}%
+Average Volume (20D): {df["volume"].iloc[-20:].mean():.2f}
+"""
+
+            return [types.TextContent(type="text", text=analysis)]
+
         # Original analyze-stock tool
         if name == "analyze-stock":
             symbol = arguments.get("symbol")
