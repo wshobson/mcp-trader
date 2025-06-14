@@ -11,18 +11,7 @@ Using Homebrew:
 brew install ta-lib
 ```
 
-### Linux (Ubuntu/Debian)
-
-```bash
-wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
-tar -xzf ta-lib-0.4.0-src.tar.gz
-cd ta-lib/
-./configure --prefix=/usr
-make
-sudo make install
-```
-
-### Linux (CentOS/RHEL/Fedora)
+### Linux
 
 ```bash
 wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
