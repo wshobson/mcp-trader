@@ -1,0 +1,8 @@
+# Default owner for everything in the repo
+* @wshobson
+
+# Python source files
+*.py @wshobson
+
+# GitHub Actions workflows
+.github/workflows/ @wshobson
