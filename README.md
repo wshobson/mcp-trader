@@ -1,32 +1,34 @@
 # 📦 Project Archived
 
-**This project has been migrated to a new repository.**
+**This project has been superseded by a completely new MCP server.**
 
-## New Repository Location
+## New MCP Server
 
-This MCP Trader Server project has moved to:
+A new, completely rewritten MCP server is now available at:
 
 **🔗 https://github.com/wshobson/maverick-mcp**
 
 ## What This Means
 
 - This repository (`mcp-trader`) is now archived and will no longer receive updates
-- All future development, bug fixes, and new features will happen in the new repository
-- The new repository contains the latest version of the code with all recent improvements
+- The new repository contains a completely new MCP server with enhanced capabilities
+- This is not a migration of the same codebase, but rather a fresh implementation
 
-## Migration Instructions
+## Getting Started with the New Server
 
-Please update your references to use the new repository:
+To use the new MCP server:
 
 1. **Clone the new repository:**
    ```bash
    git clone https://github.com/wshobson/maverick-mcp.git
    ```
 
-2. **Update your Claude Desktop configuration** to point to the new repository path
+2. **Follow the setup instructions** in the new repository's README
 
-3. **Star/watch the new repository** to stay updated with the latest changes
+3. **Update your Claude Desktop configuration** to use the new server
+
+4. **Star/watch the new repository** to stay updated with the latest features
 
 ## Thank You
 
-Thank you for your interest in this project. We look forward to continued development in the new repository!
+Thank you for your interest in this project. The new MCP server offers enhanced capabilities and a completely fresh implementation!
